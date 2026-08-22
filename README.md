@@ -4,7 +4,7 @@ A multi-portal healthcare platform for managing appointments, AI-powered visit s
 
 ---
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────┐      ┌──────────────────┐      ┌─────────────────┐
@@ -24,7 +24,7 @@ A multi-portal healthcare platform for managing appointments, AI-powered visit s
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 
@@ -81,7 +81,7 @@ npm run dev             # Starts on port 5173
 
 ---
 
-## 📋 Environment Variables
+##  Environment Variables
 
 See [`backend/.env.example`](backend/.env.example) for the complete list. Key variables:
 
@@ -99,7 +99,7 @@ See [`backend/.env.example`](backend/.env.example) for the complete list. Key va
 
 ---
 
-## 🗄️ Database Schema
+##  Database Schema
 
 ### Tables
 
@@ -115,7 +115,7 @@ See [`backend/.env.example`](backend/.env.example) for the complete list. Key va
 | `notification_logs`       | Email/calendar send tracking + retry queue                  |
 
 ### Critical Index
-
+ 
 ```sql
 CREATE UNIQUE INDEX idx_no_double_booking
 ON appointments (doctor_id, slot_start)
@@ -126,7 +126,7 @@ This partial unique index is the primary guard against double-booking.
 
 ---
 
-## 🔌 API Documentation
+##  API Documentation
 
 ### Authentication
 
@@ -187,7 +187,7 @@ This partial unique index is the primary guard against double-booking.
 
 ---
 
-## 🤖 LLM Prompts
+##  LLM Prompts
 
 ### Pre-Visit Summary
 
@@ -219,7 +219,7 @@ Both prompts and responses are stored in the database for audit purposes.
 
 ---
 
-## 📅 Google Calendar OAuth Setup
+##  Google Calendar OAuth Setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
@@ -239,7 +239,7 @@ Both prompts and responses are stored in the database for audit purposes.
 
 ---
 
-## 🏗️ Deployment
+##  Deployment
 
 ### Backend (Render/Railway)
 
@@ -258,13 +258,13 @@ Both prompts and responses are stored in the database for audit purposes.
 
 ---
 
-## 📝 Design Documents
+##  Design Documents
 
 - [`SYSTEM_DESIGN.md`](SYSTEM_DESIGN.md) — Double-booking prevention, slot holds, leave conflicts, notification reliability
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 healthcare-appointment-manager/
