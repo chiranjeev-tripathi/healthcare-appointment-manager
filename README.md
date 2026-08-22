@@ -1,7 +1,7 @@
 # 🏥 Healthcare Appointment & Follow-up Manager
 
 A multi-portal healthcare platform for managing appointments, AI-powered visit summaries, and integrated notifications.
-
+ 
 ---
 
 ##  Architecture
