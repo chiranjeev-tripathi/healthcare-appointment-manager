@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────
+
+enum Role {
+  PATIENT
+  DOCTOR
+  ADMIN
+}
+
+enum AppointmentStatus {
+  HELD
+  BOOKED
+  COMPLETED
+  CANCELLED
+}
+
+enum UrgencyLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum NotificationType {
+  EMAIL
+  CALENDAR
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  DEAD_LETTER
+}
+
+enum ReminderStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+// ─── Models ───────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  role          Role
+  name          String
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  refreshToken  String?  @map("refresh_token")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  doctorProfile       DoctorProfile?
+  patientAppointments Appointment[]         @relation("PatientAppointments")
+  doctorAppointments  Appointment[]         @relation("DoctorAppointments")
+  medicationReminders MedicationReminder[]
+
+  @@map("users")
+}
+
+model DoctorProfile {
+  id                  String @id @default(uuid())
+  userId              String @unique @map("user_id")
+  specialisation      String
+  workingHours        Json   @map("working_hours")
+  // working_hours schema: { monday: { start: "09:00", end: "17:00" }, tuesday: { start: "09:00", end: "17:00" }, ... }
+  slotDurationMinutes Int    @default(30) @map("slot_duration_minutes")
+
+  // Google Calendar OAuth tokens (encrypted in practice)
+  calendarAccessToken  String? @map("calendar_access_token")
+  calendarRefreshToken String? @map("calendar_refresh_token")
+  calendarTokenExpiry  DateTime? @map("calendar_token_expiry")
+
+  // Relations
+  user   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leaves DoctorLeave[]
+
+  @@map("doctor_profiles")
+}
+
+model DoctorLeave {
+  id       String   @id @default(uuid())
+  doctorId String   @map("doctor_id")
+  date     DateTime @db.Date
+  reason   String?
+
+  // Relations
+  doctor DoctorProfile @relation(fields: [doctorId], references: [userId], onDelete: Cascade)
+
+  @@unique([doctorId, date])
+  @@map("doctor_leaves")
+}
+
+model Appointment {
+  id              String            @id @default(uuid())
+  patientId       String            @map("patient_id")
+  doctorId        String            @map("doctor_id")
+  slotStart       DateTime          @map("slot_start")
+  slotEnd         DateTime          @map("slot_end")
+  status          AppointmentStatus @default(HELD)
+  heldUntil       DateTime?         @map("held_until")
+  calendarEventId String?           @map("calendar_event_id")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  patient     User         @relation("PatientAppointments", fields: [patientId], references: [id])
+  doctor      User         @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  symptomForm SymptomForm?
+  visitNotes  VisitNotes?
+
+  // NOTE: The critical partial unique index is applied via raw SQL migration:
+  // CREATE UNIQUE INDEX idx_no_double_booking ON appointments (doctor_id, slot_start)
+  // WHERE status IN ('HELD', 'BOOKED');
+  // This prevents double-booking at the database level.
+
+  @@index([doctorId, slotStart])
+  @@index([patientId])
+  @@index([status])
+  @@index([heldUntil])
+  @@map("appointments")
+}
+
+model SymptomForm {
+  id            String       @id @default(uuid())
+  appointmentId String       @unique @map("appointment_id")
+  rawSymptoms   String       @map("raw_symptoms") @db.Text
+  aiSummaryJson Json?        @map("ai_summary_json")
+  aiPromptUsed  String?      @map("ai_prompt_used") @db.Text
+  urgencyLevel  UrgencyLevel? @map("urgency_level")
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  // Relations
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@map("symptom_forms")
+}
+
+model VisitNotes {
+  id                  String   @id @default(uuid())
+  appointmentId       String   @unique @map("appointment_id")
+  clinicalNotes       String   @map("clinical_notes") @db.Text
+  prescription        String?  @db.Text
+  aiPatientSummaryJson Json?   @map("ai_patient_summary_json")
+  aiPromptUsed        String?  @map("ai_prompt_used") @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  // Relations
+  appointment          Appointment          @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  medicationReminders  MedicationReminder[]
+
+  @@map("visit_notes")
+}
+
+model MedicationReminder {
+  id          String         @id @default(uuid())
+  visitNoteId String         @map("visit_note_id")
+  patientId   String         @map("patient_id")
+  medication  String
+  dosage      String
+  frequency   String         // e.g., "once_daily", "twice_daily", "thrice_daily"
+  startDate   DateTime       @map("start_date") @db.Date
+  endDate     DateTime?      @map("end_date") @db.Date
+  nextSendAt  DateTime       @map("next_send_at")
+  status      ReminderStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  // Relations
+  visitNote VisitNotes @relation(fields: [visitNoteId], references: [id], onDelete: Cascade)
+  patient   User       @relation(fields: [patientId], references: [id])
+
+  @@index([nextSendAt, status])
+  @@map("medication_reminders")
+}
+
+model NotificationLog {
+  id             String             @id @default(uuid())
+  type           NotificationType
+  recipientEmail String             @map("recipient_email")
+  subject        String
+  status         NotificationStatus @default(PENDING)
+  retryCount     Int                @default(0) @map("retry_count")
+  maxRetries     Int                @default(5) @map("max_retries")
+  nextRetryAt    DateTime?          @map("next_retry_at")
+  payload        Json
+  errorMessage   String?            @map("error_message") @db.Text
+  createdAt      DateTime           @default(now()) @map("created_at")
+  updatedAt      DateTime           @updatedAt @map("updated_at")
+
+  @@index([status, nextRetryAt])
+  @@map("notification_logs")
+}
